@@ -2,7 +2,7 @@ const alexaSDK = require('alexa-sdk');
 const awsSDK = require('aws-sdk');
 const promisify = require('es6-promisify');
 
-const appId = 'REPLACE WITH YOUR SKILL APPLICATION ID';
+const appId = 'arn:aws:lambda:us-east-1:678697930350:function:CoffeePro';
 const recipesTable = 'Recipes';
 const docClient = new awsSDK.DynamoDB.DocumentClient();
 
@@ -401,7 +401,8 @@ const handlers = {
 
 exports.handler = function handler(event, context) {
   const alexa = alexaSDK.handler(event, context);
-  alexa.APP_ID = appId;
+  // alexa.APP_ID = appId;
+  alexa.appId = appId;
   alexa.registerHandlers(handlers);
   alexa.execute();
 };
