@@ -2,7 +2,8 @@ const alexaSDK = require('alexa-sdk');
 const awsSDK = require('aws-sdk');
 const promisify = require('es6-promisify');
 
-const appId = 'arn:aws:lambda:us-east-1:678697930350:function:CoffeePro';
+// const appId = 'arn:aws:lambda:us-east-1:678697930350:function:CoffeePro';
+const appId = 'amzn1.ask.skill.33e18e3f-2310-4112-b9f5-9390ade25609';
 const recipesTable = 'Recipes';
 const docClient = new awsSDK.DynamoDB.DocumentClient();
 
@@ -25,6 +26,46 @@ const handlers = {
   'LaunchRequest'() {
     this.emit(':ask', instructions);
   },
+
+
+
+  /**
+   * List all coffee stats
+   * Slots: GetCoffeeStatsQuickOrLong
+   */
+  'GetCoffeeStatsIntent'() {
+    const { userId } = this.event.session.user;
+    const { slots } = this.event.request.intent;
+    let output;
+
+    // prompt for slot data if needed
+    if (!slots.GetCoffeeStatsQuickOrLong.value) {
+      const slotToElicit = 'GetCoffeeStatsQuickOrLong';
+      const speechOutput = 'Would you like to hear quick stats or long stats or do you not care?';
+      const repromptSpeech = 'Would you like to hear quick stats or long stats or do you not care?';
+      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+    }
+
+    const isQuick = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'quick';
+    const isLong = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'long';
+
+    if (isQuick || isLong) {
+      output = `The following ${isQuick ? 'quick' : 'long'} stat briefing are as follows: <break strength="x-strong" />`;
+    }
+    else {
+      output = 'The following statistics are as follows: <break strength="x-strong" />';
+    }
+
+    output += 'There have been 87 pots of coffee brewed last month and 14 brewed so far this month.  5 french roast and 9 medium roast.';
+    if (isLong) {
+      output += 'On average, most coffee is brewed on a Monday.  There have been 957 pots of coffee brewed this year.  Most coffee is brewed between the hours of 7am and 8am.';
+    }
+    console.log('output', output);
+    this.emit(':tell', output);
+  },
+
+
+
 
   /**
    * Adds a recipe to the current user's saved recipes.
