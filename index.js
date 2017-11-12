@@ -95,7 +95,7 @@ const handlers = {
   'GetCoffeeLastBrewedIntent'() {
     const { userId } = this.event.session.user;
     const { slots } = this.event.request.intent;
-    let output;
+    let output = "";
 
     console.log("Slots value", slots.CoffeeRoastType.value);
 
