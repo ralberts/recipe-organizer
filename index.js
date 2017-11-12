@@ -89,33 +89,59 @@ const handlers = {
 
   
   /**
-   * List all coffee stats
-   * Slots: MediumRoast, FrenchRoast, DecafRoast
+   * Get last coffee update
+   * Slots: CoffeeRoastType
    */
   'GetCoffeeLastBrewedIntent'() {
     const { userId } = this.event.session.user;
     const { slots } = this.event.request.intent;
     let output;
 
-    output = 'The last pot of coffee was brewed at 8 23am';
+    console.log("Slots value", slots.CoffeeRoastType.value);
 
-    if (slots.MediumRoast.value && slots.MediumRoast.value.toLowerCase() === 'medium') {
-      output = 'The medium breakfast blend roast was last brewed at 8am.';
+    // prompt for slot data if needed
+    if (!slots.CoffeeRoastType.value) {
+      const lastBrewed = 'The last pot of coffee was brewed at 8 23am<break strength="x-strong" />';
+      const slotToElicit = 'CoffeeRoastType';
+      const speechOutput = lastBrewed + 'To hear about a specific roast type, please tell me the name?';
+      const repromptSpeech = 'To hear about a specific roast type, please tell me the name?';
+      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
     }
 
-    if (slots.FrenchRoast.value && slots.FrenchRoast.value.toLowerCase() === 'french') {
-      output = 'The french roast was last brewed at 7 23am.';
+    if (slots.CoffeeRoastType.value.toLowerCase() === 'medium') {
+      output = 'The medium breakfast blend roast was last brewed at 8am';
     }
 
-    if (slots.DecafRoast.value && slots.DecafRoast.value.toLowerCase() === 'decaf') {
-      output = 'Decaffeinated coffee is like a hairless cat, it exists, but that doesn’t make it right.';
+    if (slots.CoffeeRoastType.value.toLowerCase()  === 'french') {
+      output = 'The french roast was last brewed at 7 23am';
     }
 
-    output += _.sample(quotes);
+    if (slots.CoffeeRoastType.value.toLowerCase()  === 'decaf') {
+      output = 'Decaffeinated coffee is like a hairless cat, it exists, but that doesn’t make it right';
+    }
+
+    output += '<break time="1s"/>' + _.sample(quotes);
 
     console.log('output', output);
     this.emit(':tell', output);
   },
+
+
+  /**
+   * Get coffee quote
+   */
+  'GetCoffeeQuote'() {
+    const { userId } = this.event.session.user;
+    const { slots } = this.event.request.intent;
+    let output;
+
+    output = _.sample(quotes);
+
+    console.log('output', output);
+    this.emit(':tell', output);
+  },
+
+
 
 
   /**
