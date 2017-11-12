@@ -1,6 +1,7 @@
 const alexaSDK = require('alexa-sdk');
 const awsSDK = require('aws-sdk');
 const promisify = require('es6-promisify');
+const _ = require('lodash');
 
 // const appId = 'arn:aws:lambda:us-east-1:678697930350:function:CoffeePro';
 const appId = 'amzn1.ask.skill.33e18e3f-2310-4112-b9f5-9390ade25609';
@@ -17,6 +18,27 @@ const instructions = `Welcome to Recipe Organizer<break strength="medium" />
                       The following commands are available: add recipe, get recipe,
                       get all recipes, get a random recipe, and delete recipe. What 
                       would you like to do?`;
+
+const quotes = [  
+  'Please drink responsibly.',
+  'As Kevin says - Just give me my caffeine and nobody gets hurt!',
+  'Coffee can’t cure everything, but it can cure the mornings!',
+  'Error running WAKEUP.BAT: COFFEE.INI not found.',
+  'Coffee, like life… One sip at a time.',
+  'Death before decaf!!!',
+  'Bean me up!',
+  'COFFEE : Cup OF Finest Enjoyment Ever!',
+  'Hello. My name is Laura and I’m a coffeeholic. It’s been 38 seconds since my last sip.',
+  'Nothing really can be said after the first sip but a desiringly quiet utter of, “mmmm, coffeeee”.',
+  'Coffee, all the goodness of life in a cup.',
+  'Coffee is like drinking sunshine!',
+  'Latte is French for “You just paid too much for your coffee”.',
+  'OCD: Obsessive Coffee Disorder',
+  'SHHHH My coffee and I are having a moment.  I’ll deal with you later.',
+  'Not to get technical, but according to chemistry, coffee is a solution.',
+  'It’s not procrastinating if you’re drinking coffee, it’s procaffinating.',
+  'Coffee is the foundation of my food pyramid.'
+];
 
 const handlers = {
 
@@ -65,6 +87,35 @@ const handlers = {
   },
 
 
+  
+  /**
+   * List all coffee stats
+   * Slots: MediumRoast, FrenchRoast, DecafRoast
+   */
+  'GetCoffeeLastBrewedIntent'() {
+    const { userId } = this.event.session.user;
+    const { slots } = this.event.request.intent;
+    let output;
+
+    output = 'The last pot of coffee was brewed at 8 23am';
+
+    if (slots.MediumRoast.value && slots.MediumRoast.value.toLowerCase() === 'medium') {
+      output = 'The medium breakfast blend roast was last brewed at 8am.';
+    }
+
+    if (slots.FrenchRoast.value && slots.FrenchRoast.value.toLowerCase() === 'french') {
+      output = 'The french roast was last brewed at 7 23am.';
+    }
+
+    if (slots.DecafRoast.value && slots.DecafRoast.value.toLowerCase() === 'decaf') {
+      output = 'Decaffeinated coffee is like a hairless cat, it exists, but that doesn’t make it right.';
+    }
+
+    output += _.sample(quotes);
+
+    console.log('output', output);
+    this.emit(':tell', output);
+  },
 
 
   /**
