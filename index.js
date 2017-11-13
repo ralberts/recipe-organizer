@@ -23,39 +23,70 @@ const config = {
 }
 firebase.initializeApp(config);
 const firebaseDB = firebase.database();
-// test();
-// function test() {
-//   const collection = firebaseDB.ref('presses');
-//   collection.once('value').then((snap) => {
-//     const presses = _.map(snap.val(), 'type');
-//     const totalPots = presses.length;
-//     let frenchPots = 0;
-//     let morningPots = 0;
-//     presses.forEach((value) => {
-//       if (value === 'French Roast') {
-//         frenchPots++;
-//       } else if (value === 'Morning Roast') {
-//         morningPots++;
-//       }
-//     });
-//     // const isQuick = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'quick';
-//     // const isLong = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'long';
-//
-//     if (isQuick || isLong) {
-//       output = `The following ${isQuick ? 'quick' : 'long'} stat briefing are as follows: <break strength="x-strong" />`;
-//     }
-//     else {
-//       output = 'The following statistics are as follows: <break strength="x-strong" />';
-//     }
-//
-//     output += 'There have been ' + totalPots + ' pots of coffee brewed this month; ' + frenchPots + ' french roast and ' + morningPots + ' medium roast.';
-//     if (isLong) {
-//       output += 'On average, most coffee is brewed on a Monday.  There have been ' + totalPots + ' pots of coffee brewed this year.  Most coffee is brewed between the hours of 7am and 8am.';
-//     }
-//     console.log('output', output);
-//     this.emit(':tell', output);
-//   });
-// }
+test();
+function test() {
+  let output;
+  const one_day = 1000*60*60*24;
+  const one_hour = 1000*60*60;
+  const one_minute = 1000*60;
+  const one_second = 1000;
+
+  const collection = firebaseDB.ref('presses');
+  // prompt for slot data if needed
+  if (false) {
+    collection.once('value').then((snap) => {
+      const presses = _.map(snap.val());
+      const type = _.sortBy(presses, "date").reverse()[0].type;
+      const date = new Date(_.sortBy(presses, "date").reverse()[0].date);
+      const lastBrewed = "The last pot of coffee was a pot of " + type + " and was brewed at " + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + "on " + date.toDateString();
+      const slotToElicit = 'CoffeeRoastType';
+      const speechOutput = lastBrewed + 'To hear about a specific roast type, please tell me the name?';
+      const repromptSpeech = 'To hear about a specific roast type, please tell me the name?';
+      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+    });
+  } else {
+    collection.once('value').then((snap) => {
+      let type = "french";
+      console.log("no type");
+      let presses = _.map(snap.val());
+      presses = _.filter(presses, function(item) {
+        return item.type.toLowerCase().includes(type.toLowerCase());
+      });
+      const queriedType = _.sortBy(presses, "date").reverse()[0].type;
+      const difference = Date.parse(new Date().toISOString()) - Date.parse(_.sortBy(presses, "date").reverse()[0].date);
+
+      const days = Math.floor(difference/one_day);
+      const hours = Math.floor(difference/one_hour);
+      const minutes = Math.floor(difference/one_minute);
+      const seconds = Math.floor(difference/one_second);
+      output = "It's been ";
+      if (days > 0) {
+        // console.log(days);
+        output += (days + ' day(s), ');
+      }
+      if (hours > 0) {
+        // console.log(hours);
+        output += (hours - days * 24 + ' hour(s), ');
+      }
+      if (minutes > 0) {
+        // console.log(minutes);
+        output += (minutes - hours * 60 + ' minute(s), ');
+      }
+      if (seconds > 0){
+        // console.log(seconds);
+        output += (seconds - minutes * 60 + ' second(s)');
+      }
+      output += " since a pot of " + queriedType + " was brewed."
+
+      // const type = _.sortBy(presses, "date").reverse()[0].type;
+      // const date = new Date(_.sortBy(presses, "date").reverse()[0].date);
+      // output = "The last pot of coffee was a pot of " + type + " and was brewed at " + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + "on " + date.toDateString();
+
+      console.log('output', output);
+      this.emit(':tell', output);
+    });
+  }
+}
 
 const instructions = `Welcome to Recipe Organizer<break strength="medium" />
                       The following commands are available: add recipe, get recipe,
@@ -134,7 +165,7 @@ const handlers = {
         output = 'The following statistics are as follows: <break strength="x-strong" />';
       }
 
-      output += 'There have been ' + totalPots + ' pots of coffee brewed this month; ' + frenchPots + ' french roast and ' + morningPots + ' medium roast.';
+      output += 'There have been ' + totalPots + ' pots of coffee brewed this month; ' + frenchPots + ' french roast and ' + morningPots + ' morning roast.';
       if (isLong) {
         output += '<break strength="x-strong" On average, most coffee is brewed on a Monday.  There have been ' + totalPots + ' pots of coffee brewed this year.  Most coffee is brewed between the hours of 7am and 8am.';
       }
@@ -152,17 +183,64 @@ const handlers = {
     const { userId } = this.event.session.user;
     const { slots } = this.event.request.intent;
     let output;
+    const one_day = 1000*60*60*24;
+    const one_hour = 1000*60*60;
+    const one_minute = 1000*60;
+    const one_second = 1000;
 
     const collection = firebaseDB.ref('presses');
-    collection.once('value').then((snap) => {
-      const presses = _.map(snap.val());
-      const type = _.sortBy(presses, "date").reverse()[0].type;
-      const date = new Date(_.sortBy(presses, "date").reverse()[0].date);
-      output = "The last pot of coffee was a pot of " + type + " and was brewed at " + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + "on " + date.toDateString();
-
+    // prompt for slot data if needed
+    if (!slots.CoffeeRoastType.value) {
+      collection.once('value').then((snap) => {
+        const presses = _.map(snap.val());
+        const type = _.sortBy(presses, "date").reverse()[0].type;
+        const date = new Date(_.sortBy(presses, "date").reverse()[0].date);
+        const lastBrewed = "The last pot of coffee was a pot of " + type + " and was brewed at " + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + "on " + date.toDateString() + '<break strength="x-strong"/>';
+        const slotToElicit = 'CoffeeRoastType';
+        const speechOutput = lastBrewed + 'To hear about a specific roast type, please tell me the name?';
+        const repromptSpeech = 'To hear about a specific roast type, please tell me the name?';
+        return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+      });
+    } else if (slots.CoffeeRoastType.value.toLowerCase() === 'decaf') {
+      output = 'Decaffeinated coffee is like a hairless cat, it exists, but that doesn’t make it right';
       console.log('output', output);
       this.emit(':tell', output);
-    });
+    } else {
+      collection.once('value').then((snap) => {
+        if (slots.CoffeeRoastType.value.toLowerCase() === 'medium') {
+          slots.CoffeeRoastType.value = 'morning';
+        }
+        let presses = _.map(snap.val());
+        presses = _.filter(presses, function(item) {
+          return item.type.toLowerCase().includes(slots.CoffeeRoastType.value.toLowerCase());
+        });
+        const queriedType = _.sortBy(presses, "date").reverse()[0].type;
+
+        const difference = Date.parse(new Date().toISOString()) - Date.parse(_.sortBy(presses, "date").reverse()[0].date);
+        const days = Math.floor(difference/one_day);
+        const hours = Math.floor(difference/one_hour);
+        const minutes = Math.floor(difference/one_minute);
+        const seconds = Math.floor(difference/one_second);
+
+        output = "It's been ";
+        if (days > 0) {
+          output += (days + ' day(s), ');
+        }
+        if (hours > 0) {
+          output += (hours - days * 24 + ' hour(s), ');
+        }
+        if (minutes > 0) {
+          output += (minutes - hours * 60 + ' minute(s), ');
+        }
+        if (seconds > 0){
+          output += (seconds - minutes * 60 + ' second(s)');
+        }
+        output += " since a pot of " + queriedType + " was brewed."
+
+        console.log('output', output);
+        this.emit(':tell', output);
+      });
+    }
   },
 
 
