@@ -12,6 +12,7 @@
     "alexa-sdk": "^1.0.12",
     "aws-sdk": "^2.110.0",
     "es6-promisify": "^5.0.0",
+    "firebase": "^4.6.2",
     "lodash": "^4.17.4"
   }
 }

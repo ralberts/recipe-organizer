@@ -14,12 +14,55 @@ const dbGet = promisify(docClient.get, docClient);
 const dbPut = promisify(docClient.put, docClient);
 const dbDelete = promisify(docClient.delete, docClient);
 
-const instructions = `Welcome to Recipe Organizer<break strength="medium" /> 
+// firebase connection
+const firebase = require('firebase');
+const config = {
+  apiKey: 'AIzaSyDMNa01ILPSggoTa8CURd_Bt52eDaKN_Fc',
+  authDomain: 'coffee-dash-button.firebaseapp.com',
+  databaseURL: 'https://coffee-dash-button.firebaseio.com/'
+}
+firebase.initializeApp(config);
+const firebaseDB = firebase.database();
+// test();
+// function test() {
+//   const collection = firebaseDB.ref('presses');
+//   collection.once('value').then((snap) => {
+//     const presses = _.map(snap.val(), 'type');
+//     const totalPots = presses.length;
+//     let frenchPots = 0;
+//     let morningPots = 0;
+//     presses.forEach((value) => {
+//       if (value === 'French Roast') {
+//         frenchPots++;
+//       } else if (value === 'Morning Roast') {
+//         morningPots++;
+//       }
+//     });
+//     // const isQuick = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'quick';
+//     // const isLong = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'long';
+//
+//     if (isQuick || isLong) {
+//       output = `The following ${isQuick ? 'quick' : 'long'} stat briefing are as follows: <break strength="x-strong" />`;
+//     }
+//     else {
+//       output = 'The following statistics are as follows: <break strength="x-strong" />';
+//     }
+//
+//     output += 'There have been ' + totalPots + ' pots of coffee brewed this month; ' + frenchPots + ' french roast and ' + morningPots + ' medium roast.';
+//     if (isLong) {
+//       output += 'On average, most coffee is brewed on a Monday.  There have been ' + totalPots + ' pots of coffee brewed this year.  Most coffee is brewed between the hours of 7am and 8am.';
+//     }
+//     console.log('output', output);
+//     this.emit(':tell', output);
+//   });
+// }
+
+const instructions = `Welcome to Recipe Organizer<break strength="medium" />
                       The following commands are available: add recipe, get recipe,
-                      get all recipes, get a random recipe, and delete recipe. What 
+                      get all recipes, get a random recipe, and delete recipe. What
                       would you like to do?`;
 
-const quotes = [  
+const quotes = [
   'Please drink responsibly.',
   'As Kevin says - Just give me my caffeine and nobody gets hurt!',
   'Coffee can’t cure everything, but it can cure the mornings!',
@@ -63,31 +106,44 @@ const handlers = {
     // prompt for slot data if needed
     if (!slots.GetCoffeeStatsQuickOrLong.value) {
       const slotToElicit = 'GetCoffeeStatsQuickOrLong';
-      const speechOutput = 'Would you like to hear quick stats or long stats or do you not care?';
-      const repromptSpeech = 'Would you like to hear quick stats or long stats or do you not care?';
+      const speechOutput = 'Would you like to hear quick stats or long stats?';
+      const repromptSpeech = 'Would you like to hear quick stats or long stats?';
       return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
     }
 
-    const isQuick = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'quick';
-    const isLong = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'long';
+    const collection = firebaseDB.ref('presses');
+    collection.once('value').then((snap) => {
+      const presses = _.map(snap.val(), 'type');
+      const totalPots = presses.length;
+      let frenchPots = 0;
+      let morningPots = 0;
+      presses.forEach((value) => {
+        if (value === 'French Roast') {
+          frenchPots++;
+        } else if (value === 'Morning Roast') {
+          morningPots++;
+        }
+      });
+      const isQuick = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'quick';
+      const isLong = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'long';
 
-    if (isQuick || isLong) {
-      output = `The following ${isQuick ? 'quick' : 'long'} stat briefing are as follows: <break strength="x-strong" />`;
-    }
-    else {
-      output = 'The following statistics are as follows: <break strength="x-strong" />';
-    }
+      if (isQuick || isLong) {
+        output = `The following ${isQuick ? 'quick' : 'long'} stat briefing are as follows: <break strength="x-strong" />`;
+      }
+      else {
+        output = 'The following statistics are as follows: <break strength="x-strong" />';
+      }
 
-    output += 'There have been 87 pots of coffee brewed last month and 14 brewed so far this month.  5 french roast and 9 medium roast.';
-    if (isLong) {
-      output += 'On average, most coffee is brewed on a Monday.  There have been 957 pots of coffee brewed this year.  Most coffee is brewed between the hours of 7am and 8am.';
-    }
-    console.log('output', output);
-    this.emit(':tell', output);
+      output += 'There have been ' + totalPots + ' pots of coffee brewed this month; ' + frenchPots + ' french roast and ' + morningPots + ' medium roast.';
+      if (isLong) {
+        output += '<break strength="x-strong" On average, most coffee is brewed on a Monday.  There have been ' + totalPots + ' pots of coffee brewed this year.  Most coffee is brewed between the hours of 7am and 8am.';
+      }
+      console.log('output', output);
+      this.emit(':tell', output);
+    });
   },
 
 
-  
   /**
    * Get last coffee update
    * Slots: CoffeeRoastType
@@ -95,35 +151,18 @@ const handlers = {
   'GetCoffeeLastBrewedIntent'() {
     const { userId } = this.event.session.user;
     const { slots } = this.event.request.intent;
-    let output = "";
+    let output;
 
-    console.log("Slots value", slots.CoffeeRoastType.value);
+    const collection = firebaseDB.ref('presses');
+    collection.once('value').then((snap) => {
+      const presses = _.map(snap.val());
+      const type = _.sortBy(presses, "date").reverse()[0].type;
+      const date = new Date(_.sortBy(presses, "date").reverse()[0].date);
+      output = "The last pot of coffee was a pot of " + type + " and was brewed at " + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + "on " + date.toDateString();
 
-    // prompt for slot data if needed
-    if (!slots.CoffeeRoastType.value) {
-      const lastBrewed = 'The last pot of coffee was brewed at 8 23am<break strength="x-strong" />';
-      const slotToElicit = 'CoffeeRoastType';
-      const speechOutput = lastBrewed + 'To hear about a specific roast type, please tell me the name?';
-      const repromptSpeech = 'To hear about a specific roast type, please tell me the name?';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-
-    if (slots.CoffeeRoastType.value.toLowerCase() === 'medium') {
-      output = 'The medium breakfast blend roast was last brewed at 8am';
-    }
-
-    if (slots.CoffeeRoastType.value.toLowerCase()  === 'french') {
-      output = 'The french roast was last brewed at 7 23am';
-    }
-
-    if (slots.CoffeeRoastType.value.toLowerCase()  === 'decaf') {
-      output = 'Decaffeinated coffee is like a hairless cat, it exists, but that doesn’t make it right';
-    }
-
-    output += '<break time="1s"/>' + _.sample(quotes);
-
-    console.log('output', output);
-    this.emit(':tell', output);
+      console.log('output', output);
+      this.emit(':tell', output);
+    });
   },
 
 
@@ -135,10 +174,14 @@ const handlers = {
     const { slots } = this.event.request.intent;
     let output;
 
-    output = _.sample(quotes);
-
-    console.log('output', output);
-    this.emit(':tell', output);
+    const collection = firebaseDB.ref('messages');
+    collection.once('value').then((snap) => {
+      var messages = snap.val();
+      output = _.sample(_.map(messages, 'text'))
+      console.log(output);
+      this.emit(':tell', output);
+      firebase.database().goOffline();
+    });
   },
 
 
