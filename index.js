@@ -23,70 +23,6 @@ const config = {
 }
 firebase.initializeApp(config);
 const firebaseDB = firebase.database();
-test();
-function test() {
-  let output;
-  const one_day = 1000*60*60*24;
-  const one_hour = 1000*60*60;
-  const one_minute = 1000*60;
-  const one_second = 1000;
-
-  const collection = firebaseDB.ref('presses');
-  // prompt for slot data if needed
-  if (false) {
-    collection.once('value').then((snap) => {
-      const presses = _.map(snap.val());
-      const type = _.sortBy(presses, "date").reverse()[0].type;
-      const date = new Date(_.sortBy(presses, "date").reverse()[0].date);
-      const lastBrewed = "The last pot of coffee was a pot of " + type + " and was brewed at " + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + "on " + date.toDateString();
-      const slotToElicit = 'CoffeeRoastType';
-      const speechOutput = lastBrewed + 'To hear about a specific roast type, please tell me the name?';
-      const repromptSpeech = 'To hear about a specific roast type, please tell me the name?';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    });
-  } else {
-    collection.once('value').then((snap) => {
-      let type = "french";
-      console.log("no type");
-      let presses = _.map(snap.val());
-      presses = _.filter(presses, function(item) {
-        return item.type.toLowerCase().includes(type.toLowerCase());
-      });
-      const queriedType = _.sortBy(presses, "date").reverse()[0].type;
-      const difference = Date.parse(new Date().toISOString()) - Date.parse(_.sortBy(presses, "date").reverse()[0].date);
-
-      const days = Math.floor(difference/one_day);
-      const hours = Math.floor(difference/one_hour);
-      const minutes = Math.floor(difference/one_minute);
-      const seconds = Math.floor(difference/one_second);
-      output = "It's been ";
-      if (days > 0) {
-        // console.log(days);
-        output += (days + ' day(s), ');
-      }
-      if (hours > 0) {
-        // console.log(hours);
-        output += (hours - days * 24 + ' hour(s), ');
-      }
-      if (minutes > 0) {
-        // console.log(minutes);
-        output += (minutes - hours * 60 + ' minute(s), ');
-      }
-      if (seconds > 0){
-        // console.log(seconds);
-        output += (seconds - minutes * 60 + ' second(s)');
-      }
-      output += " since a pot of " + queriedType + " was brewed."
-
-      // const type = _.sortBy(presses, "date").reverse()[0].type;
-      // const date = new Date(_.sortBy(presses, "date").reverse()[0].date);
-      // output = "The last pot of coffee was a pot of " + type + " and was brewed at " + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + "on " + date.toDateString();
-
-      console.log('output', output);
-      this.emit(':tell', output);
-    });
-  }
-}
 
 const instructions = `Welcome to Recipe Organizer<break strength="medium" />
                       The following commands are available: add recipe, get recipe,
@@ -141,7 +77,7 @@ const handlers = {
       const repromptSpeech = 'Would you like to hear quick stats or long stats?';
       return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
     }
-
+    console.log("long or quick?: ", slots.GetCoffeeStatsQuickOrLong.value);
     const collection = firebaseDB.ref('presses');
     collection.once('value').then((snap) => {
       const presses = _.map(snap.val(), 'type');
@@ -155,6 +91,7 @@ const handlers = {
           morningPots++;
         }
       });
+      console.log(frenchPots, morningPots);
       const isQuick = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'quick';
       const isLong = slots.GetCoffeeStatsQuickOrLong.value.toLowerCase() === 'long';
 
@@ -248,375 +185,381 @@ const handlers = {
    * Get coffee quote
    */
   'GetCoffeeQuote'() {
+    console.log("start");
     const { userId } = this.event.session.user;
     const { slots } = this.event.request.intent;
-    let output;
-
+    let output = "This is a default";
+    console.log("outside async");
     const collection = firebaseDB.ref('messages');
     collection.once('value').then((snap) => {
+      console.log("inside async");
       var messages = snap.val();
       output = _.sample(_.map(messages, 'text'))
       console.log(output);
       this.emit(':tell', output);
-      firebase.database().goOffline();
-    });
+      // firebase.database().goOffline();
+    }, (e) => {
+      console.log("Get Quote Error: ", e);
+    }).catch(err => {
+        console.error("Get Quote Catch: ", err);
+    });
   },
 
 
 
 
-  /**
-   * Adds a recipe to the current user's saved recipes.
-   * Slots: RecipeName, RecipeLocation, LongOrQuick
-   */
-  'AddRecipeIntent'() {
-    const { userId } = this.event.session.user;
-    const { slots } = this.event.request.intent;
-
-    // prompt for slot values and request a confirmation for each
-
-    // RecipeName
-    if (!slots.RecipeName.value) {
-      const slotToElicit = 'RecipeName';
-      const speechOutput = 'What is the name of the recipe?';
-      const repromptSpeech = 'Please tell me the name of the recipe';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-    else if (slots.RecipeName.confirmationStatus !== 'CONFIRMED') {
-
-      if (slots.RecipeName.confirmationStatus !== 'DENIED') {
-        // slot status: unconfirmed
-        const slotToConfirm = 'RecipeName';
-        const speechOutput = `The name of the recipe is ${slots.RecipeName.value}, correct?`;
-        const repromptSpeech = speechOutput;
-        return this.emit(':confirmSlot', slotToConfirm, speechOutput, repromptSpeech);
-      }
-
-      // slot status: denied -> reprompt for slot data
-      const slotToElicit = 'RecipeName';
-      const speechOutput = 'What is the name of the recipe you would like to add?';
-      const repromptSpeech = 'Please tell me the name of the recipe';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-
-    // RecipeLocation
-    if (!slots.RecipeLocation.value) {
-      const slotToElicit = 'RecipeLocation';
-      const speechOutput = 'Where can the recipe be found?';
-      const repromptSpeech = 'Please give me a location where the recipe can be found.';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-    else if (slots.RecipeLocation.confirmationStatus !== 'CONFIRMED') {
-
-      if (slots.RecipeLocation.confirmationStatus !== 'DENIED') {
-        // slot status: unconfirmed
-        const slotToConfirm = 'RecipeLocation';
-        const speechOutput = `The recipe location is ${slots.RecipeLocation.value}, correct?`;
-        const repromptSpeech = speechOutput;
-        return this.emit(':confirmSlot', slotToConfirm, speechOutput, repromptSpeech);
-      }
-
-      // slot status: denied -> reprompt for slot data
-      const slotToElicit = 'RecipeLocation';
-      const speechOutput = 'Where can the recipe be found?';
-      const repromptSpeech = 'Please give me a location where the recipe can be found.';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-
-    // LongOrQuick
-    if (!slots.LongOrQuick.value) {
-      const slotToElicit = 'LongOrQuick';
-      const speechOutput = 'Is this a quick or long recipe to make?';
-      const repromptSpeech = 'Is this a quick or long recipe to make?';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-    else if (slots.LongOrQuick.confirmationStatus !== 'CONFIRMED') {
-
-      if (slots.LongOrQuick.confirmationStatus !== 'DENIED') {
-        // slot status: unconfirmed
-        const slotToConfirm = 'LongOrQuick';
-        const speechOutput = `This is a ${slots.LongOrQuick.value} recipe, correct?`;
-        const repromptSpeech = speechOutput;
-        return this.emit(':confirmSlot', slotToConfirm, speechOutput, repromptSpeech);
-      }
-
-      // slot status: denied -> reprompt for slot data
-      const slotToElicit = 'LongOrQuick';
-      const speechOutput = 'Is this a quick or long recipe to make?';
-      const repromptSpeech = 'Is this a quick or long recipe to make?';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-
-    // all slot values received and confirmed, now add the record to DynamoDB
-
-    const name = slots.RecipeName.value;
-    const location = slots.RecipeLocation.value;
-    const isQuick = slots.LongOrQuick.value.toLowerCase() === 'quick';
-    const dynamoParams = {
-      TableName: recipesTable,
-      Item: {
-        Name: name,
-        UserId: userId,
-        Location: location,
-        IsQuick: isQuick
-      }
-    };
-
-    const checkIfRecipeExistsParams = {
-      TableName: recipesTable,
-      Key: {
-        Name: name,
-        UserId: userId
-      }
-    };
-
-    console.log('Attempting to add recipe', dynamoParams);
-
-    // query DynamoDB to see if the item exists first
-    dbGet(checkIfRecipeExistsParams)
-      .then(data => {
-        console.log('Get item succeeded', data);
-
-        const recipe = data.Item;
-
-        if (recipe) {
-          const errorMsg = `Recipe ${name} already exists!`;
-          this.emit(':tell', errorMsg);
-          throw new Error(errorMsg);
-        }
-        else {
-          // no match, add the recipe
-          return dbPut(dynamoParams);
-        }
-      })
-      .then(data => {
-        console.log('Add item succeeded', data);
-
-        this.emit(':tell', `Recipe ${name} added!`);
-      })
-      .catch(err => {
-        console.error(err);
-      });
-  },
-
-  /**
-   * Lists all saved recipes for the current user. The user can filter by quick or long recipes.
-   * Slots: GetRecipeQuickOrLong
-   */
-  'GetAllRecipesIntent'() {
-    const { userId } = this.event.session.user;
-    const { slots } = this.event.request.intent;
-    let output;
-
-    // prompt for slot data if needed
-    if (!slots.GetRecipeQuickOrLong.value) {
-      const slotToElicit = 'GetRecipeQuickOrLong';
-      const speechOutput = 'Would you like a quick or long recipe or do you not care?';
-      const repromptSpeech = 'Would you like a quick or long recipe or do you not care?';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-
-    const isQuick = slots.GetRecipeQuickOrLong.value.toLowerCase() === 'quick';
-    const isLong = slots.GetRecipeQuickOrLong.value.toLowerCase() === 'long';
-    const dynamoParams = {
-      TableName: recipesTable
-    };
-
-    if (isQuick || isLong) {
-      dynamoParams.FilterExpression = 'UserId = :user_id AND IsQuick = :is_quick';
-      dynamoParams.ExpressionAttributeValues = { ':user_id': userId, ':is_quick': isQuick };
-      output = `The following ${isQuick ? 'quick' : 'long'} recipes were found: <break strength="x-strong" />`;
-    }
-    else {
-      dynamoParams.FilterExpression = 'UserId = :user_id';
-      dynamoParams.ExpressionAttributeValues = { ':user_id': userId };
-      output = 'The following recipes were found: <break strength="x-strong" />';
-    }
-
-    // query DynamoDB
-    dbScan(dynamoParams)
-      .then(data => {
-        console.log('Read table succeeded!', data);
-
-        if (data.Items && data.Items.length) {
-          data.Items.forEach(item => { output += `${item.Name}<break strength="x-strong" />`; });
-        }
-        else {
-          output = 'No recipes found!';
-        }
-
-        console.log('output', output);
-
-        this.emit(':tell', output);
-      })
-      .catch(err => {
-        console.error(err);
-      });
-  },
-
-  /**
-   * Reads the full info of the selected recipe.
-   * Slots: RecipeName
-   */
-  'GetRecipeIntent'() {
-    const { slots } = this.event.request.intent;
-
-    // prompt for slot data if needed
-    if (!slots.RecipeName.value) {
-      const slotToElicit = 'RecipeName';
-      const speechOutput = 'What is the name of the recipe?';
-      const repromptSpeech = 'Please tell me the name of the recipe';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-
-    const { userId } = this.event.session.user;
-    const recipeName = slots.RecipeName.value;
-    const dynamoParams = {
-      TableName: recipesTable,
-      Key: {
-        Name: recipeName,
-        UserId: userId
-      }
-    };
-
-    console.log('Attempting to read data');
-
-    // query DynamoDB
-    dbGet(dynamoParams)
-      .then(data => {
-        console.log('Get item succeeded', data);
-
-        const recipe = data.Item;
-
-        if (recipe) {
-          this.emit(':tell', `Recipe ${recipeName} is located in ${recipe.Location} and it
-                        is a ${recipe.IsQuick ? 'Quick' : 'Long'} recipe to make.`);
-        }
-        else {
-          this.emit(':tell', `Recipe ${recipeName} not found!`);
-        }
-      })
-      .catch(err => console.error(err));
-  },
-
-  /**
-   * Gets a random saved recipe for this user. The user can filter by quick or long recipes.
-   * Slots: GetRecipeQuickOrLong
-   */
-  'GetRandomRecipeIntent'() {
-    const { slots } = this.event.request.intent;
-
-    // prompt for slot data if needed
-    if (!slots.GetRecipeQuickOrLong.value) {
-      const slotToElicit = 'GetRecipeQuickOrLong';
-      const speechOutput = 'Would you like a quick or long recipe or do you not care?';
-      const repromptSpeech = 'I said, would you like a quick or long recipe or do you not care?';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-
-    const quickOrLongSlotValue = slots.GetRecipeQuickOrLong.value.toLowerCase();
-    const isQuick = quickOrLongSlotValue === 'quick';
-    const isLong = quickOrLongSlotValue === 'long';
-    const { userId } = this.event.session.user;
-    const dynamoParams = {
-      TableName: recipesTable,
-      FilterExpression: 'UserId = :user_id',
-      ExpressionAttributeValues: { ':user_id': userId }
-    };
-
-    if (isQuick || isLong) {
-      dynamoParams.FilterExpression += ' AND IsQuick = :is_quick';
-      dynamoParams.ExpressionAttributeValues[':is_quick'] = isQuick;
-    }
-
-    console.log('Attempting to read data');
-
-    // query DynamoDB
-    dbScan(dynamoParams)
-      .then(data => {
-        console.log('Read table succeeded!', data);
-
-        const recipes = data.Items;
-
-        if (!recipes.length) {
-          this.emit(':tell', 'No recipes added.');
-        }
-        else {
-          const randomNumber = Math.floor(Math.random() * recipes.length);
-          const recipe = recipes[randomNumber];
-
-          this.emit(':tell', `The lucky recipe is ${recipe.Name} <break time="500ms"/> and it is located in ${recipe.Location} and it is a ${recipe.IsQuick ? 'quick' : 'long'} recipe to make.`);
-        }
-      })
-      .catch(err => console.error(err));
-  },
-
-  /**
-   * Allow the user to delete one of their recipes.
-   */
-  'DeleteRecipeIntent'() {
-    const { slots } = this.event.request.intent;
-
-    // prompt for the recipe name if needed and then require a confirmation
-    if (!slots.RecipeName.value) {
-      const slotToElicit = 'RecipeName';
-      const speechOutput = 'What is the name of the recipe you would like to delete?';
-      const repromptSpeech = 'Please tell me the name of the recipe';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-    else if (slots.RecipeName.confirmationStatus !== 'CONFIRMED') {
-
-      if (slots.RecipeName.confirmationStatus !== 'DENIED') {
-        // slot status: unconfirmed
-        const slotToConfirm = 'RecipeName';
-        const speechOutput = `You would like to delete the recipe ${slots.RecipeName.value}, correct?`;
-        const repromptSpeech = speechOutput;
-        return this.emit(':confirmSlot', slotToConfirm, speechOutput, repromptSpeech);
-      }
-
-      // slot status: denied -> reprompt for slot data
-      const slotToElicit = 'RecipeName';
-      const speechOutput = 'What is the name of the recipe you would like to delete?';
-      const repromptSpeech = 'Please tell me the name of the recipe';
-      return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
-    }
-
-    const { userId } = this.event.session.user;
-    const recipeName = slots.RecipeName.value;
-    const dynamoParams = {
-      TableName: recipesTable,
-      Key: {
-        Name: recipeName,
-        UserId: userId
-      }
-    };
-
-    console.log('Attempting to read data');
-
-    // query DynamoDB to see if the item exists first
-    dbGet(dynamoParams)
-      .then(data => {
-        console.log('Get item succeeded', data);
-
-        const recipe = data.Item;
-
-        if (recipe) {
-          console.log('Attempting to delete data', data);
-
-          return dbDelete(dynamoParams);
-        }
-
-        const errorMsg = `Recipe ${recipeName} not found!`;
-        this.emit(':tell', errorMsg);
-        throw new Error(errorMsg);
-      })
-      .then(data => {
-        console.log('Delete item succeeded', data);
-
-        this.emit(':tell', `Recipe ${recipeName} deleted!`);
-      })
-      .catch(err => console.log(err));
-  },
+  // /**
+  //  * Adds a recipe to the current user's saved recipes.
+  //  * Slots: RecipeName, RecipeLocation, LongOrQuick
+  //  */
+  // 'AddRecipeIntent'() {
+  //   const { userId } = this.event.session.user;
+  //   const { slots } = this.event.request.intent;
+  //
+  //   // prompt for slot values and request a confirmation for each
+  //
+  //   // RecipeName
+  //   if (!slots.RecipeName.value) {
+  //     const slotToElicit = 'RecipeName';
+  //     const speechOutput = 'What is the name of the recipe?';
+  //     const repromptSpeech = 'Please tell me the name of the recipe';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //   else if (slots.RecipeName.confirmationStatus !== 'CONFIRMED') {
+  //
+  //     if (slots.RecipeName.confirmationStatus !== 'DENIED') {
+  //       // slot status: unconfirmed
+  //       const slotToConfirm = 'RecipeName';
+  //       const speechOutput = `The name of the recipe is ${slots.RecipeName.value}, correct?`;
+  //       const repromptSpeech = speechOutput;
+  //       return this.emit(':confirmSlot', slotToConfirm, speechOutput, repromptSpeech);
+  //     }
+  //
+  //     // slot status: denied -> reprompt for slot data
+  //     const slotToElicit = 'RecipeName';
+  //     const speechOutput = 'What is the name of the recipe you would like to add?';
+  //     const repromptSpeech = 'Please tell me the name of the recipe';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //
+  //   // RecipeLocation
+  //   if (!slots.RecipeLocation.value) {
+  //     const slotToElicit = 'RecipeLocation';
+  //     const speechOutput = 'Where can the recipe be found?';
+  //     const repromptSpeech = 'Please give me a location where the recipe can be found.';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //   else if (slots.RecipeLocation.confirmationStatus !== 'CONFIRMED') {
+  //
+  //     if (slots.RecipeLocation.confirmationStatus !== 'DENIED') {
+  //       // slot status: unconfirmed
+  //       const slotToConfirm = 'RecipeLocation';
+  //       const speechOutput = `The recipe location is ${slots.RecipeLocation.value}, correct?`;
+  //       const repromptSpeech = speechOutput;
+  //       return this.emit(':confirmSlot', slotToConfirm, speechOutput, repromptSpeech);
+  //     }
+  //
+  //     // slot status: denied -> reprompt for slot data
+  //     const slotToElicit = 'RecipeLocation';
+  //     const speechOutput = 'Where can the recipe be found?';
+  //     const repromptSpeech = 'Please give me a location where the recipe can be found.';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //
+  //   // LongOrQuick
+  //   if (!slots.LongOrQuick.value) {
+  //     const slotToElicit = 'LongOrQuick';
+  //     const speechOutput = 'Is this a quick or long recipe to make?';
+  //     const repromptSpeech = 'Is this a quick or long recipe to make?';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //   else if (slots.LongOrQuick.confirmationStatus !== 'CONFIRMED') {
+  //
+  //     if (slots.LongOrQuick.confirmationStatus !== 'DENIED') {
+  //       // slot status: unconfirmed
+  //       const slotToConfirm = 'LongOrQuick';
+  //       const speechOutput = `This is a ${slots.LongOrQuick.value} recipe, correct?`;
+  //       const repromptSpeech = speechOutput;
+  //       return this.emit(':confirmSlot', slotToConfirm, speechOutput, repromptSpeech);
+  //     }
+  //
+  //     // slot status: denied -> reprompt for slot data
+  //     const slotToElicit = 'LongOrQuick';
+  //     const speechOutput = 'Is this a quick or long recipe to make?';
+  //     const repromptSpeech = 'Is this a quick or long recipe to make?';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //
+  //   // all slot values received and confirmed, now add the record to DynamoDB
+  //
+  //   const name = slots.RecipeName.value;
+  //   const location = slots.RecipeLocation.value;
+  //   const isQuick = slots.LongOrQuick.value.toLowerCase() === 'quick';
+  //   const dynamoParams = {
+  //     TableName: recipesTable,
+  //     Item: {
+  //       Name: name,
+  //       UserId: userId,
+  //       Location: location,
+  //       IsQuick: isQuick
+  //     }
+  //   };
+  //
+  //   const checkIfRecipeExistsParams = {
+  //     TableName: recipesTable,
+  //     Key: {
+  //       Name: name,
+  //       UserId: userId
+  //     }
+  //   };
+  //
+  //   console.log('Attempting to add recipe', dynamoParams);
+  //
+  //   // query DynamoDB to see if the item exists first
+  //   dbGet(checkIfRecipeExistsParams)
+  //     .then(data => {
+  //       console.log('Get item succeeded', data);
+  //
+  //       const recipe = data.Item;
+  //
+  //       if (recipe) {
+  //         const errorMsg = `Recipe ${name} already exists!`;
+  //         this.emit(':tell', errorMsg);
+  //         throw new Error(errorMsg);
+  //       }
+  //       else {
+  //         // no match, add the recipe
+  //         return dbPut(dynamoParams);
+  //       }
+  //     })
+  //     .then(data => {
+  //       console.log('Add item succeeded', data);
+  //
+  //       this.emit(':tell', `Recipe ${name} added!`);
+  //     })
+  //     .catch(err => {
+  //       console.error(err);
+  //     });
+  // },
+  //
+  // /**
+  //  * Lists all saved recipes for the current user. The user can filter by quick or long recipes.
+  //  * Slots: GetRecipeQuickOrLong
+  //  */
+  // 'GetAllRecipesIntent'() {
+  //   const { userId } = this.event.session.user;
+  //   const { slots } = this.event.request.intent;
+  //   let output;
+  //
+  //   // prompt for slot data if needed
+  //   if (!slots.GetRecipeQuickOrLong.value) {
+  //     const slotToElicit = 'GetRecipeQuickOrLong';
+  //     const speechOutput = 'Would you like a quick or long recipe or do you not care?';
+  //     const repromptSpeech = 'Would you like a quick or long recipe or do you not care?';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //
+  //   const isQuick = slots.GetRecipeQuickOrLong.value.toLowerCase() === 'quick';
+  //   const isLong = slots.GetRecipeQuickOrLong.value.toLowerCase() === 'long';
+  //   const dynamoParams = {
+  //     TableName: recipesTable
+  //   };
+  //
+  //   if (isQuick || isLong) {
+  //     dynamoParams.FilterExpression = 'UserId = :user_id AND IsQuick = :is_quick';
+  //     dynamoParams.ExpressionAttributeValues = { ':user_id': userId, ':is_quick': isQuick };
+  //     output = `The following ${isQuick ? 'quick' : 'long'} recipes were found: <break strength="x-strong" />`;
+  //   }
+  //   else {
+  //     dynamoParams.FilterExpression = 'UserId = :user_id';
+  //     dynamoParams.ExpressionAttributeValues = { ':user_id': userId };
+  //     output = 'The following recipes were found: <break strength="x-strong" />';
+  //   }
+  //
+  //   // query DynamoDB
+  //   dbScan(dynamoParams)
+  //     .then(data => {
+  //       console.log('Read table succeeded!', data);
+  //
+  //       if (data.Items && data.Items.length) {
+  //         data.Items.forEach(item => { output += `${item.Name}<break strength="x-strong" />`; });
+  //       }
+  //       else {
+  //         output = 'No recipes found!';
+  //       }
+  //
+  //       console.log('output', output);
+  //
+  //       this.emit(':tell', output);
+  //     })
+  //     .catch(err => {
+  //       console.error(err);
+  //     });
+  // },
+  //
+  // /**
+  //  * Reads the full info of the selected recipe.
+  //  * Slots: RecipeName
+  //  */
+  // 'GetRecipeIntent'() {
+  //   const { slots } = this.event.request.intent;
+  //
+  //   // prompt for slot data if needed
+  //   if (!slots.RecipeName.value) {
+  //     const slotToElicit = 'RecipeName';
+  //     const speechOutput = 'What is the name of the recipe?';
+  //     const repromptSpeech = 'Please tell me the name of the recipe';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //
+  //   const { userId } = this.event.session.user;
+  //   const recipeName = slots.RecipeName.value;
+  //   const dynamoParams = {
+  //     TableName: recipesTable,
+  //     Key: {
+  //       Name: recipeName,
+  //       UserId: userId
+  //     }
+  //   };
+  //
+  //   console.log('Attempting to read data');
+  //
+  //   // query DynamoDB
+  //   dbGet(dynamoParams)
+  //     .then(data => {
+  //       console.log('Get item succeeded', data);
+  //
+  //       const recipe = data.Item;
+  //
+  //       if (recipe) {
+  //         this.emit(':tell', `Recipe ${recipeName} is located in ${recipe.Location} and it
+  //                       is a ${recipe.IsQuick ? 'Quick' : 'Long'} recipe to make.`);
+  //       }
+  //       else {
+  //         this.emit(':tell', `Recipe ${recipeName} not found!`);
+  //       }
+  //     })
+  //     .catch(err => console.error(err));
+  // },
+  //
+  // /**
+  //  * Gets a random saved recipe for this user. The user can filter by quick or long recipes.
+  //  * Slots: GetRecipeQuickOrLong
+  //  */
+  // 'GetRandomRecipeIntent'() {
+  //   const { slots } = this.event.request.intent;
+  //
+  //   // prompt for slot data if needed
+  //   if (!slots.GetRecipeQuickOrLong.value) {
+  //     const slotToElicit = 'GetRecipeQuickOrLong';
+  //     const speechOutput = 'Would you like a quick or long recipe or do you not care?';
+  //     const repromptSpeech = 'I said, would you like a quick or long recipe or do you not care?';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //
+  //   const quickOrLongSlotValue = slots.GetRecipeQuickOrLong.value.toLowerCase();
+  //   const isQuick = quickOrLongSlotValue === 'quick';
+  //   const isLong = quickOrLongSlotValue === 'long';
+  //   const { userId } = this.event.session.user;
+  //   const dynamoParams = {
+  //     TableName: recipesTable,
+  //     FilterExpression: 'UserId = :user_id',
+  //     ExpressionAttributeValues: { ':user_id': userId }
+  //   };
+  //
+  //   if (isQuick || isLong) {
+  //     dynamoParams.FilterExpression += ' AND IsQuick = :is_quick';
+  //     dynamoParams.ExpressionAttributeValues[':is_quick'] = isQuick;
+  //   }
+  //
+  //   console.log('Attempting to read data');
+  //
+  //   // query DynamoDB
+  //   dbScan(dynamoParams)
+  //     .then(data => {
+  //       console.log('Read table succeeded!', data);
+  //
+  //       const recipes = data.Items;
+  //
+  //       if (!recipes.length) {
+  //         this.emit(':tell', 'No recipes added.');
+  //       }
+  //       else {
+  //         const randomNumber = Math.floor(Math.random() * recipes.length);
+  //         const recipe = recipes[randomNumber];
+  //
+  //         this.emit(':tell', `The lucky recipe is ${recipe.Name} <break time="500ms"/> and it is located in ${recipe.Location} and it is a ${recipe.IsQuick ? 'quick' : 'long'} recipe to make.`);
+  //       }
+  //     })
+  //     .catch(err => console.error(err));
+  // },
+  //
+  // /**
+  //  * Allow the user to delete one of their recipes.
+  //  */
+  // 'DeleteRecipeIntent'() {
+  //   const { slots } = this.event.request.intent;
+  //
+  //   // prompt for the recipe name if needed and then require a confirmation
+  //   if (!slots.RecipeName.value) {
+  //     const slotToElicit = 'RecipeName';
+  //     const speechOutput = 'What is the name of the recipe you would like to delete?';
+  //     const repromptSpeech = 'Please tell me the name of the recipe';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //   else if (slots.RecipeName.confirmationStatus !== 'CONFIRMED') {
+  //
+  //     if (slots.RecipeName.confirmationStatus !== 'DENIED') {
+  //       // slot status: unconfirmed
+  //       const slotToConfirm = 'RecipeName';
+  //       const speechOutput = `You would like to delete the recipe ${slots.RecipeName.value}, correct?`;
+  //       const repromptSpeech = speechOutput;
+  //       return this.emit(':confirmSlot', slotToConfirm, speechOutput, repromptSpeech);
+  //     }
+  //
+  //     // slot status: denied -> reprompt for slot data
+  //     const slotToElicit = 'RecipeName';
+  //     const speechOutput = 'What is the name of the recipe you would like to delete?';
+  //     const repromptSpeech = 'Please tell me the name of the recipe';
+  //     return this.emit(':elicitSlot', slotToElicit, speechOutput, repromptSpeech);
+  //   }
+  //
+  //   const { userId } = this.event.session.user;
+  //   const recipeName = slots.RecipeName.value;
+  //   const dynamoParams = {
+  //     TableName: recipesTable,
+  //     Key: {
+  //       Name: recipeName,
+  //       UserId: userId
+  //     }
+  //   };
+  //
+  //   console.log('Attempting to read data');
+  //
+  //   // query DynamoDB to see if the item exists first
+  //   dbGet(dynamoParams)
+  //     .then(data => {
+  //       console.log('Get item succeeded', data);
+  //
+  //       const recipe = data.Item;
+  //
+  //       if (recipe) {
+  //         console.log('Attempting to delete data', data);
+  //
+  //         return dbDelete(dynamoParams);
+  //       }
+  //
+  //       const errorMsg = `Recipe ${recipeName} not found!`;
+  //       this.emit(':tell', errorMsg);
+  //       throw new Error(errorMsg);
+  //     })
+  //     .then(data => {
+  //       console.log('Delete item succeeded', data);
+  //
+  //       this.emit(':tell', `Recipe ${recipeName} deleted!`);
+  //     })
+  //     .catch(err => console.log(err));
+  // },
 
   'Unhandled'() {
     console.error('problem', this.event);
