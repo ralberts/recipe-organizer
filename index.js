@@ -167,7 +167,7 @@ const handlers = {
 
       output += 'There have been ' + totalPots + ' pots of coffee brewed this month; ' + frenchPots + ' french roast and ' + morningPots + ' morning roast.';
       if (isLong) {
-        output += '<break strength="x-strong" On average, most coffee is brewed on a Monday.  There have been ' + totalPots + ' pots of coffee brewed this year.  Most coffee is brewed between the hours of 7am and 8am.';
+        output += '<break strength="x-strong"/> On average, most coffee is brewed on a Monday.  There have been ' + totalPots + ' pots of coffee brewed this year.  Most coffee is brewed between the hours of 7am and 8am.';
       }
       console.log('output', output);
       this.emit(':tell', output);
